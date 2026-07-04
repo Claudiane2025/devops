@@ -1,0 +1,13 @@
+services:
+  tarefas:
+    build:
+      context: .
+    ports:
+      - "80:8000"
+    command: "-e main:APP"
+  notificacoes:
+    build:
+      context: .
+    ports:
+      - "81:8000"
+    command: "-e notificacao:APP_NOTIFICACAO"
