@@ -1,3 +1,6 @@
 fastapi[standard]
 pytest
 httpx
+pytest-cov
+bandit
+pylint
