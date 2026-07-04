@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.exceptions import HTTPException
+
 from datetime import datetime
 
 import requests
@@ -53,6 +55,17 @@ def listar_tarefa_especifica(id: int):
     
     return mensagem_padrao
 
+# Implementar!
+# @APP.post("/tarefas")
+# Rota /tarefas (POST)
+#   Entrada: id da tarefa (int), titulo da tarefa (str) e descrição da tarefa (str)
+#   Funcionamento:
+#       - Recebe os dados como parâmetro de requisição
+#       - Cria uma nova tarefa usando a função `nova_tarefa`
+#       - Adiciona nova tarefa a LISTA_TAREFAS
+#   # Saída:
+#       - Retorna "OK" se a tarefa foi criada
+#       - Se a tarefa existir, retornar "TAREFA JÁ EXISTE"
 
 @APP.post("/tarefas", status_code=201)
 def criar_tarefa(id: int, titulo: str, descricao: str):
@@ -61,7 +74,8 @@ def criar_tarefa(id: int, titulo: str, descricao: str):
     tarefa_existe = verificar_existencia_tarefa(id)
 
     if tarefa_existe:
-        return {"mensagem": "TAREFA JÁ EXISTE!"}
+        ex = HTTPException(status_code=202, detail={"mensagem": "TAREFA JÁ EXISTE!"})
+        raise ex
     
     nova = nova_tarefa(id, titulo, descricao)
 
@@ -69,6 +83,15 @@ def criar_tarefa(id: int, titulo: str, descricao: str):
 
     return {"mensagem": "OK"}
 
+# @APP.put("/tarefas/{id}")
+# Rota /tarefas/{id} (PUT)
+#   Entrada: id da tarefa (int), titulo da tarefa (str), descrição da tarefa (str) e concluido (bool)
+#   Funcionamento:
+#       - Recebe os dados como parâmetro de requisição
+#       - Atualiza informações da tarefa de id específico
+#   # Saída:
+#       - Retorna "OK" se a tarefa foi atualizada
+#       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
 @APP.put("/tarefas/{id}")
 def atualizar_tarefa(id: int, titulo: str = "", descricao: str = "", concluido: bool = False):
     global LISTA_TAREFAS
@@ -89,17 +112,30 @@ def atualizar_tarefa(id: int, titulo: str = "", descricao: str = "", concluido: 
     if titulo != "":
         LISTA_TAREFAS[indice]['titulo'] = titulo
     
-    if descricao !=  "": 
+    if descricao !=  "":
         LISTA_TAREFAS[indice]['descricao'] = descricao
     
     if concluido == True:
-        requests.post(f"http://localhost:8002/notificar?titulo={tarefa['titulo']}&data_finalizacao={datetime.now()}")
+        requests.post(
+            f"http://localhost:8002/notificar?titulo={tarefa['titulo']}&data_finalizacao={datetime.now()}",
+            timeout=10
+        )
 
     LISTA_TAREFAS[indice]['concluido'] = concluido
 
     return {"mensagem": "OK"}
 
-
+# @APP.delete("/tarefas")
+# Rota /tarefas/{id} (DELETE)
+#   Entrada: id da tarefa (int)
+#   Funcionamento:
+#       - Recebe os dados como parâmetro de requisição
+#       - Busca pela tarefa com base no ID
+#       - Se tarefa existir, remover de LISTA_TAREFAS
+#       - Se NÃO existir, retorna "TAREFA NÃO EXISTE"
+#   # Saída:
+#       - Retorna "OK" se a tarefa foi removida
+#       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
 @APP.delete("/tarefas/{id}")
 def apagar_tarefa(id: int):
     global LISTA_TAREFAS
