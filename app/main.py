@@ -54,7 +54,7 @@ def listar_tarefa_especifica(id: int):
     return mensagem_padrao
 
 
-@APP.post("/tarefas")
+@APP.post("/tarefas", status_code=201)
 def criar_tarefa(id: int, titulo: str, descricao: str):
     global LISTA_TAREFAS
 
