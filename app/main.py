@@ -156,3 +156,7 @@ def apagar_tarefa(id: int):
     LISTA_TAREFAS.pop(indice)
 
     return {"mensagem": "OK"}
+
+@APP.get("/health", status_code=200)
+def health():
+    return {"status": "OK"}

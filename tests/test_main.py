@@ -45,4 +45,10 @@ def test_atualizar_tarefa():
     assert requisicao.status_code == 200
     assert requisicao.json()["titulo"] == "tarefa_mock"
 
+def test_health():
+    requisicao = CLIENT.get("/health")
+
+    assert requisicao.status_code == 200
+    assert requisicao.json() == {"status": "OK"}
+
 
