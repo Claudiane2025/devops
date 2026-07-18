@@ -4,9 +4,25 @@ from fastapi.exceptions import HTTPException
 from datetime import datetime
 
 import requests
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+
+logger = logging.getLogger("log_aula")
 
 LISTA_TAREFAS = []
 APP = FastAPI()
+
+@APP.middleware("http")
+async def log_requests(request, call_next):
+    logger.info(f"Acesso à rota: {request.method} {request.url.path}")
+
+    response = await call_next(request)
+
+    return response
 
 def nova_tarefa(id: int, titulo: str, descricao: str):
     """Função auxiliar para criar uma tarefa usando dicionário (`dict`)"""
@@ -74,12 +90,15 @@ def criar_tarefa(id: int, titulo: str, descricao: str):
     tarefa_existe = verificar_existencia_tarefa(id)
 
     if tarefa_existe:
+        logger.error(f"Tentativa de criar tarefa existente: ID={id}")
         ex = HTTPException(status_code=202, detail={"mensagem": "TAREFA JÁ EXISTE!"})
         raise ex
     
     nova = nova_tarefa(id, titulo, descricao)
 
     LISTA_TAREFAS.append(nova)
+    logger.info(f"Tarefa criada: ID={id}")
+    logger.debug(f"Dados da tarefa: {nova}")
 
     return {"mensagem": "OK"}
 
