@@ -33,7 +33,7 @@ jobs:
       - name: 'FOSSA'
         uses: fossas/fossa-action@main
         with:
-          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+          api-key: ${{ secrets.FOSSA_API_KEY }}
   entrega:
     needs: [integracao, fossa]
     name: 'Entrega'
