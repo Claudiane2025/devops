@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
+from fastapi.responses import PlainTextResponse
 
 from datetime import datetime
 
 import requests
 import logging
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -13,165 +15,390 @@ logging.basicConfig(
 
 logger = logging.getLogger("log_aula")
 
+
 LISTA_TAREFAS = []
+
+
+# ==========================
+# MÉTRICAS
+# ==========================
+
+TOTAL_REQUISICOES = 0
+TOTAL_TAREFAS_CRIADAS = 0
+TOTAL_TAREFAS_ATUALIZADAS = 0
+TOTAL_TAREFAS_REMOVIDAS = 0
+
+TEMPOS_CONCLUSAO = []
+
+
 APP = FastAPI()
+
+
+
+# ==========================
+# MIDDLEWARE
+# ==========================
 
 @APP.middleware("http")
 async def log_requests(request, call_next):
-    logger.info(f"Acesso à rota: {request.method} {request.url.path}")
+
+    global TOTAL_REQUISICOES
+
+    TOTAL_REQUISICOES += 1
+
+    logger.info(
+        f"Acesso à rota: {request.method} {request.url.path}"
+    )
 
     response = await call_next(request)
 
     return response
 
+
+
+# ==========================
+# AUXILIARES
+# ==========================
+
 def nova_tarefa(id: int, titulo: str, descricao: str):
-    """Função auxiliar para criar uma tarefa usando dicionário (`dict`)"""
+
     return {
         "id": id,
         "titulo": titulo,
         "descricao": descricao,
         "concluido": False,
-        "criado_em": datetime.now()
+        "criado_em": datetime.now(),
+        "concluido_em": None
     }
 
+
+
 def verificar_existencia_tarefa(id: int):
-    """Função auxiliar para verificar a existência de uma tarefa com base no seu ID"""
+
     for tarefa in LISTA_TAREFAS:
-        if id == tarefa['id']:
+
+        if id == tarefa["id"]:
             return True
+
     return False
+
+
+
+# ==========================
+# ROTAS
+# ==========================
+
 
 @APP.get("/")
 def index():
+
     return "Olá, DevOps!"
+
+
+
+# ==========================
+# MÉTRICAS
+# ==========================
+
+@APP.get("/metrics", response_class=PlainTextResponse)
+def metrics():
+
+
+    total_tarefas = len(LISTA_TAREFAS)
+
+
+    tarefas_concluidas = len(
+        [
+            tarefa
+            for tarefa in LISTA_TAREFAS
+            if tarefa["concluido"]
+        ]
+    )
+
+
+    tarefas_pendentes = (
+        total_tarefas -
+        tarefas_concluidas
+    )
+
+
+    if len(TEMPOS_CONCLUSAO) > 0:
+
+        tempo_medio = (
+            sum(TEMPOS_CONCLUSAO)
+            /
+            len(TEMPOS_CONCLUSAO)
+        )
+
+    else:
+
+        tempo_medio = 0
+
+
+
+    return f"""
+# HELP requisicoes_total Total de requisicoes
+# TYPE requisicoes_total counter
+requisicoes_total {TOTAL_REQUISICOES}
+
+
+# HELP tarefas_total Total de tarefas cadastradas
+# TYPE tarefas_total gauge
+tarefas_total {total_tarefas}
+
+
+# HELP tarefas_pendentes Total de tarefas pendentes
+# TYPE tarefas_pendentes gauge
+tarefas_pendentes {tarefas_pendentes}
+
+
+# HELP tarefas_concluidas Total de tarefas concluídas
+# TYPE tarefas_concluidas gauge
+tarefas_concluidas {tarefas_concluidas}
+
+
+# HELP tarefas_criadas_total Total de tarefas criadas
+# TYPE tarefas_criadas_total counter
+tarefas_criadas_total {TOTAL_TAREFAS_CRIADAS}
+
+
+# HELP tarefas_atualizadas_total Total de atualizações
+# TYPE tarefas_atualizadas_total counter
+tarefas_atualizadas_total {TOTAL_TAREFAS_ATUALIZADAS}
+
+
+# HELP tarefas_removidas_total Total de tarefas removidas
+# TYPE tarefas_removidas_total counter
+tarefas_removidas_total {TOTAL_TAREFAS_REMOVIDAS}
+
+
+# HELP tarefa_tempo_medio_conclusao_segundos Tempo médio para concluir tarefas
+# TYPE tarefa_tempo_medio_conclusao_segundos gauge
+tarefa_tempo_medio_conclusao_segundos {tempo_medio}
+"""
+
+
+
+# ==========================
+# LISTAR TAREFAS
+# ==========================
 
 @APP.get("/tarefas")
 def listar_tarefas():
-    # Lista tarefas (somente id e titulo)
+
+
     if len(LISTA_TAREFAS) == 0:
+
         return LISTA_TAREFAS
 
+
     tarefas = []
-    
+
+
     for tarefa in LISTA_TAREFAS:
-        info = {"id": tarefa['id'], "titulo": tarefa['titulo']}
-        tarefas.append(info)
+
+        tarefas.append(
+            {
+                "id": tarefa["id"],
+                "titulo": tarefa["titulo"]
+            }
+        )
+
 
     return tarefas
 
+
+
+
 @APP.get("/tarefas/{id}")
 def listar_tarefa_especifica(id: int):
-    mensagem_padrao = {"mensagem": "Não existe nenhuma tarefa"}
-    if len(LISTA_TAREFAS) == 0:
-        return mensagem_padrao
-    
-    # ID da tarefa é o índice na lista
-    if id >= 0 and id < len(LISTA_TAREFAS):
-        return LISTA_TAREFAS[id]
-    
-    return mensagem_padrao
 
-# Implementar!
-# @APP.post("/tarefas")
-# Rota /tarefas (POST)
-#   Entrada: id da tarefa (int), titulo da tarefa (str) e descrição da tarefa (str)
-#   Funcionamento:
-#       - Recebe os dados como parâmetro de requisição
-#       - Cria uma nova tarefa usando a função `nova_tarefa`
-#       - Adiciona nova tarefa a LISTA_TAREFAS
-#   # Saída:
-#       - Retorna "OK" se a tarefa foi criada
-#       - Se a tarefa existir, retornar "TAREFA JÁ EXISTE"
+
+    for tarefa in LISTA_TAREFAS:
+
+        if tarefa["id"] == id:
+
+            return tarefa
+
+
+    return {
+        "mensagem": "Não existe nenhuma tarefa"
+    }
+
+
+
+
+# ==========================
+# CRIAR TAREFA
+# ==========================
 
 @APP.post("/tarefas", status_code=201)
-def criar_tarefa(id: int, titulo: str, descricao: str):
-    global LISTA_TAREFAS
+def criar_tarefa(
+        id: int,
+        titulo: str,
+        descricao: str):
 
-    tarefa_existe = verificar_existencia_tarefa(id)
 
-    if tarefa_existe:
-        logger.error(f"Tentativa de criar tarefa existente: ID={id}")
-        ex = HTTPException(status_code=202, detail={"mensagem": "TAREFA JÁ EXISTE!"})
-        raise ex
-    
-    nova = nova_tarefa(id, titulo, descricao)
+    global TOTAL_TAREFAS_CRIADAS
 
-    LISTA_TAREFAS.append(nova)
-    logger.info(f"Tarefa criada: ID={id}")
-    logger.debug(f"Dados da tarefa: {nova}")
 
-    return {"mensagem": "OK"}
+    if verificar_existencia_tarefa(id):
 
-# @APP.put("/tarefas/{id}")
-# Rota /tarefas/{id} (PUT)
-#   Entrada: id da tarefa (int), titulo da tarefa (str), descrição da tarefa (str) e concluido (bool)
-#   Funcionamento:
-#       - Recebe os dados como parâmetro de requisição
-#       - Atualiza informações da tarefa de id específico
-#   # Saída:
-#       - Retorna "OK" se a tarefa foi atualizada
-#       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
-@APP.put("/tarefas/{id}")
-def atualizar_tarefa(id: int, titulo: str = "", descricao: str = "", concluido: bool = False):
-    global LISTA_TAREFAS
-
-    tarefa_existe = verificar_existencia_tarefa(id)
-
-    if not tarefa_existe:
-        return {"mensagem": "TAREFA NÃO EXISTE!"}
-    
-    tarefa = None
-    for indice in range(len(LISTA_TAREFAS)):
-        tarefa = LISTA_TAREFAS[indice]
-
-        # Sai do loop
-        if tarefa['id'] == id:
-            break
-    
-    if titulo != "":
-        LISTA_TAREFAS[indice]['titulo'] = titulo
-    
-    if descricao !=  "":
-        LISTA_TAREFAS[indice]['descricao'] = descricao
-    
-    if concluido == True:
-        requests.post(
-            f"http://notificacoes:8000/notificar?titulo={tarefa['titulo']}&data_finalizacao={datetime.now()}",
-            timeout=10
+        logger.error(
+            f"Tentativa de criar tarefa existente ID={id}"
         )
 
-    LISTA_TAREFAS[indice]['concluido'] = concluido
+        raise HTTPException(
+            status_code=202,
+            detail={
+                "mensagem": "TAREFA JÁ EXISTE!"
+            }
+        )
 
-    return {"mensagem": "OK"}
 
-# @APP.delete("/tarefas")
-# Rota /tarefas/{id} (DELETE)
-#   Entrada: id da tarefa (int)
-#   Funcionamento:
-#       - Recebe os dados como parâmetro de requisição
-#       - Busca pela tarefa com base no ID
-#       - Se tarefa existir, remover de LISTA_TAREFAS
-#       - Se NÃO existir, retorna "TAREFA NÃO EXISTE"
-#   # Saída:
-#       - Retorna "OK" se a tarefa foi removida
-#       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
+    tarefa = nova_tarefa(
+        id,
+        titulo,
+        descricao
+    )
+
+
+    LISTA_TAREFAS.append(tarefa)
+
+
+    TOTAL_TAREFAS_CRIADAS += 1
+
+
+    logger.info(
+        f"Tarefa criada ID={id}"
+    )
+
+
+    return {
+        "mensagem": "OK"
+    }
+
+
+
+
+
+# ==========================
+# ATUALIZAR TAREFA
+# ==========================
+
+@APP.put("/tarefas/{id}")
+def atualizar_tarefa(
+        id: int,
+        titulo: str = "",
+        descricao: str = "",
+        concluido: bool = False):
+
+
+    global TOTAL_TAREFAS_ATUALIZADAS
+
+
+    for tarefa in LISTA_TAREFAS:
+
+
+        if tarefa["id"] == id:
+
+
+            if titulo:
+
+                tarefa["titulo"] = titulo
+
+
+            if descricao:
+
+                tarefa["descricao"] = descricao
+
+
+
+            if concluido and not tarefa["concluido"]:
+
+
+                agora = datetime.now()
+
+
+                tarefa["concluido_em"] = agora
+
+
+                tempo = (
+                    agora -
+                    tarefa["criado_em"]
+                ).total_seconds()
+
+
+                TEMPOS_CONCLUSAO.append(
+                    tempo
+                )
+
+
+                try:
+
+                    requests.post(
+                        f"http://notificacoes:8000/notificar?"
+                        f"titulo={tarefa['titulo']}"
+                        f"&data_finalizacao={agora}",
+                        timeout=10
+                    )
+
+                except Exception as e:
+
+                    logger.error(e)
+
+
+
+            tarefa["concluido"] = concluido
+
+
+            TOTAL_TAREFAS_ATUALIZADAS += 1
+
+
+            return {
+                "mensagem": "OK"
+            }
+
+
+
+    return {
+        "mensagem": "TAREFA NÃO EXISTE!"
+    }
+
+
+
+
+
+# ==========================
+# REMOVER TAREFA
+# ==========================
+
 @APP.delete("/tarefas/{id}")
 def apagar_tarefa(id: int):
-    global LISTA_TAREFAS
 
-    tarefa_existe = verificar_existencia_tarefa(id)
 
-    if not tarefa_existe:
-        return {"mensagem": "TAREFA NÃO EXISTE"}
+    global TOTAL_TAREFAS_REMOVIDAS
 
-    tarefa = None
-    for indice in range(len(LISTA_TAREFAS)):
-        tarefa = LISTA_TAREFAS[indice]
 
-        # Sai do loop
-        if tarefa['id'] == id:
-            break
-    
-    LISTA_TAREFAS.pop(indice)
 
-    return {"mensagem": "OK"}
+    for indice, tarefa in enumerate(LISTA_TAREFAS):
+
+
+        if tarefa["id"] == id:
+
+
+            LISTA_TAREFAS.pop(indice)
+
+
+            TOTAL_TAREFAS_REMOVIDAS += 1
+
+
+            return {
+                "mensagem": "OK"
+            }
+
+
+
+    return {
+        "mensagem": "TAREFA NÃO EXISTE"
+    }
