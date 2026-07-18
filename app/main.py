@@ -256,3 +256,8 @@ def metricas():
     LOGGER.info("Rota '/metricas' acessada.")
 
     return METRICAS
+
+@APP.get("/health")
+def health():
+    LOGGER.info("Rota '/metricas' acessada.")
+    return {"mensagem": "healthy"}
