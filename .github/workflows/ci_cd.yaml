@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 'FOSSA'
-        uses: fossas/fossa-actions@main
+        uses: fossas/fossa-action@main
         with:
           FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
   entrega:
