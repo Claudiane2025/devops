@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: hrchlhck/curso-devops:latest
+          image: claudianefauro/curso-devops:latest
           ports:
             - containerPort: 8000
 ---
@@ -65,7 +65,7 @@ spec:
     spec:
       containers:
         - name: api-notificacao
-          image: hrchlhck/curso-devops
+          image: claudianefauro/curso-devops
           args: ["-e", "notificacao:APP_NOTIFICACAO"]
           ports:
             - containerPort: 8000

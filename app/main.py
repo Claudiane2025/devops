@@ -15,7 +15,7 @@ else:
     level = logging.INFO
 
 LISTA_TAREFAS = []
-APP = FastAPI()
+APP = FastAPI(root_path="/proxy/8000")
 
 LOGGER = logging.getLogger("DevOps")
 LOGGER.setLevel(level)
